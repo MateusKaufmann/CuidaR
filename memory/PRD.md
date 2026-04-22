@@ -1,51 +1,52 @@
 # RCare — PRD
 
 ## Overview
-Aplicativo mobile (Expo SDK 54) para monitorar os cuidados diários de uma idosa, com sincronização automática entre 2 dispositivos (tablet e celular) via backend MongoDB.
+App mobile (Expo SDK 54) para monitorar cuidados diários de uma idosa, com sincronização automática entre 2 dispositivos via backend MongoDB.
 
 ## Features
 
-### Core
-- **Splash screen**: abertura com logo "R" vermelho + "Care" e tagline "Cuidado com carinho"
-- **Home (RCare)** com card de avisos do dia + 3 botões (INSULINA / ALIMENTAÇÃO / ÁGUA) + FAB Assistente + botões Relatórios e Admin
-- **Insulina**: data/hora/glicemia/insulina-rápida(opcional)/obs — com validações: alerta para glicemia <40 ou >500 e insulina >20 UI
-- **Alimentação**: 6 refeições (Café, Lanche, Almoço, Lanche Tarde, Janta, Ceia) com status (comeu_tudo/metade/não_comeu) + obs — upsert por data
-- **Água**: ml + barra de progresso com meta configurável — alerta para registros >1000ml
+### Home (6 cards)
+- INSULINA, ALIMENTAÇÃO, ÁGUA, REMÉDIOS (public), ASSISTENTE, ADMINISTRADOR
 
-### Recursos adicionais
-- **Assistente (FAB)** acessível a todos: resumo semanal com pontos positivos e preocupantes
-- **Relatórios PDF** com 4 períodos: Semana, Este mês, Todo período, Personalizado
-- **Estatísticas** (admin-protegida): gráficos por período com mesmos 4 filtros
-- **Card de avisos** (home): alerta sobre refeições/glicemia/água não registradas nos horários esperados
-- **Admin** (senha padrão `2255`, configurável): painel com acesso a Estatísticas e Configurações
-- **Configurações**: nome da paciente, meta de água diária (ml), trocar senha de admin
-- **Sincronização**: auto-refresh 30s + pull-to-refresh → ambos dispositivos atualizados
+### Coleta diária (com cuidador)
+Todas as telas de registro exibem **CaregiverPicker** no topo. O cuidador selecionado é persistido em AsyncStorage e enviado em cada POST:
+- Insulina: data, hora, glicemia, insulina rápida (opcional), observações, cuidador
+- Alimentação (6 refeições): status + obs por refeição, data, cuidador. **Confirmação de edição** se data ≠ hoje
+- Água: data, hora, ml, observações, cuidador + meta configurável
+- Remédios: lista cadastrados + registra compras (data, quantidade, obs, cuidador)
 
-## Tech Stack
-- **Frontend**: Expo Router, React Native 0.81, TypeScript, react-native-chart-kit, expo-print, expo-sharing
-- **Backend**: FastAPI + Motor (MongoDB async)
-- **DB**: MongoDB coleções: `insulin`, `food`, `water`, `settings`
+### Admin (senha 2255)
+- Estatísticas (gráficos por período; timeline de eventos se dia único)
+- Relatórios PDF (Semana, Este mês, Todo período, Personalizado) — **apenas inconsistências** (inclui missing-data), food com linha extra de observações, seção Remédios, coluna Cuidador
+- **Remédios**: cadastrar (nome + origem livre) e remover (cascade purchases)
+- **Cuidadores**: cadastrar e remover
+- Configurações: senha, meta água, nome paciente
 
-## API Endpoints
-- `POST/GET/DELETE /api/insulin`
-- `POST/GET /api/food` (upsert por data) | `DELETE /api/food/{id}`
-- `POST/GET/DELETE /api/water`
-- `GET /api/stats?days=7` (legado)
-- `GET /api/reports?period=week|month|all|custom&start=&end=` — relatório completo + insights
-- `GET /api/assistant` — resumo semanal
-- `GET /api/inconsistencies` — avisos do dia
-- `GET/POST /api/settings` — meta água e nome paciente
-- `POST /api/admin/verify` — validar senha
-- `POST /api/admin/change-password` — trocar senha
+### Assistente (público)
+Resumo semanal dos últimos 7 dias com pontos positivos e preocupações (datas DD/MM/AAAA)
+
+### Home extras
+- Splash RCare (R vermelho + Care)
+- Card de avisos do dia (café/almoço/janta/glicemia/água não registrados)
+
+## API
+- `POST/GET/DELETE /api/insulin` (+ `caregiver`)
+- `POST/GET /api/food` (+ `caregiver`) | `DELETE /api/food/{id}`
+- `POST/GET/DELETE /api/water` (+ `caregiver`)
+- `POST/GET/DELETE /api/caregivers`
+- `POST/GET/DELETE /api/medicines`
+- `POST/GET/DELETE /api/medicine-purchases`
+- `GET /api/reports?period=week|month|all|custom` (retorna `purchases`, concerns incluindo missing-data)
+- `GET /api/assistant` (7 dias)
+- `GET /api/inconsistencies` (dia atual)
+- `GET/POST /api/settings`
+- `POST /api/admin/verify`, `POST /api/admin/change-password`
 
 ## Test Credentials
-- Admin password: **2255** (padrão, alterável em Configurações)
+- Admin password: **2255**
+
+## Collections (MongoDB)
+- `insulin`, `food`, `water`, `caregivers`, `medicines`, `medicine_purchases`, `settings`
 
 ## Sem autenticação de usuário
-Decisão explícita do usuário: uso restrito a 2 dispositivos familiares, sem login de usuários. Apenas área admin protegida por senha para estatísticas/configurações.
-
-## Future Enhancements
-- Push notifications / lembretes
-- Date/time picker nativo
-- Backup para nuvem
-- Tempo real via WebSocket (atualmente polling 30s)
+Uso restrito a 2 dispositivos familiares. Apenas área admin (estatísticas/relatórios/cadastros/configurações) é protegida por senha.
