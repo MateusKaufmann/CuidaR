@@ -376,6 +376,15 @@ def _period_range(period: str, start: Optional[str], end: Optional[str]):
     return today.isoformat(), today.isoformat()
 
 
+def _fmt_br(iso_date: str) -> str:
+    """Format YYYY-MM-DD to DD/MM/YYYY."""
+    try:
+        y, m, d = iso_date.split("-")
+        return f"{d}/{m}/{y}"
+    except Exception:
+        return iso_date
+
+
 def _build_insights(insulin, food, water):
     good = []
     concerns = []
@@ -386,23 +395,25 @@ def _build_insights(insulin, food, water):
         water_by_date[w["date"]] = water_by_date.get(w["date"], 0) + w["amount_ml"]
     for d, total in water_by_date.items():
         if total >= 1500:
-            good.append(f"Bastante água no dia {d} ({total} ml)")
+            good.append(f"Bastante água no dia {_fmt_br(d)} ({total} ml)")
         elif total < 800 and total > 0:
-            concerns.append(f"Pouca água no dia {d} ({total} ml)")
+            concerns.append(f"Pouca água no dia {_fmt_br(d)} ({total} ml)")
 
     # Glucose anomalies
     for i in insulin:
         g = i["glucose"]
         if g > 180:
             concerns.append(
-                f"Glicemia alta no dia {i['date']} às {i['time']} ({g} mg/dL)"
+                f"Glicemia alta no dia {_fmt_br(i['date'])} às {i['time']} ({g} mg/dL)"
             )
         elif g < 70:
             concerns.append(
-                f"Glicemia baixa no dia {i['date']} às {i['time']} ({g} mg/dL)"
+                f"Glicemia baixa no dia {_fmt_br(i['date'])} às {i['time']} ({g} mg/dL)"
             )
         elif 80 <= g <= 140:
-            good.append(f"Glicemia ideal no dia {i['date']} às {i['time']} ({g} mg/dL)")
+            good.append(
+                f"Glicemia ideal no dia {_fmt_br(i['date'])} às {i['time']} ({g} mg/dL)"
+            )
 
     # Meals
     meal_labels = {
@@ -423,9 +434,13 @@ def _build_insights(insulin, food, water):
             if m and m.get("status") == "comeu_tudo":
                 full.append(lbl)
         if missed:
-            concerns.append(f"No dia {f['date']}, não comeu: {', '.join(missed)}")
+            concerns.append(
+                f"No dia {_fmt_br(f['date'])}, não comeu: {', '.join(missed)}"
+            )
         if len(full) >= 5:
-            good.append(f"Dia {f['date']}: ótima alimentação ({len(full)} refeições completas)")
+            good.append(
+                f"Dia {_fmt_br(f['date'])}: ótima alimentação ({len(full)} refeições completas)"
+            )
 
     return {"good": good[:20], "concerns": concerns[:20]}
 

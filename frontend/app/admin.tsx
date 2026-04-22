@@ -7,30 +7,34 @@ import { COLORS } from "../src/theme";
 export default function Admin() {
   const router = useRouter();
 
+  const cards = [
+    { testID: "admin-stats-btn", route: "/stats", title: "Estatísticas",
+      sub: "Gráficos e análises por período", icon: "stats-chart", bg: COLORS.primary },
+    { testID: "admin-reports-btn", route: "/reports", title: "Relatórios PDF",
+      sub: "Exportar por semana, mês ou período", icon: "document-text", bg: COLORS.accent },
+    { testID: "admin-settings-btn", route: "/settings", title: "Configurações",
+      sub: "Senha, meta de água, nome da paciente", icon: "settings", bg: COLORS.secondary },
+  ];
+
   return (
     <ScrollView contentContainerStyle={styles.container}>
       <Text style={styles.title}>Painel do Administrador</Text>
-      <Text style={styles.sub}>Acesse estatísticas completas e configurações.</Text>
+      <Text style={styles.sub}>Acesse estatísticas, relatórios e configurações.</Text>
 
-      <TouchableOpacity testID="admin-stats-btn" style={[styles.card, { backgroundColor: COLORS.primary }]}
-        onPress={() => router.push("/stats")}>
-        <View style={styles.iconWrap}><Ionicons name="stats-chart" size={30} color={COLORS.primary} /></View>
-        <View style={{ flex: 1, marginLeft: 14 }}>
-          <Text style={styles.cardTitle}>Estatísticas</Text>
-          <Text style={styles.cardSub}>Gráficos e análises por período</Text>
-        </View>
-        <Ionicons name="chevron-forward" size={26} color="#fff" />
-      </TouchableOpacity>
-
-      <TouchableOpacity testID="admin-settings-btn" style={[styles.card, { backgroundColor: COLORS.secondary }]}
-        onPress={() => router.push("/settings")}>
-        <View style={styles.iconWrap}><Ionicons name="settings" size={30} color={COLORS.secondary} /></View>
-        <View style={{ flex: 1, marginLeft: 14 }}>
-          <Text style={styles.cardTitle}>Configurações</Text>
-          <Text style={styles.cardSub}>Senha, meta de água, nome</Text>
-        </View>
-        <Ionicons name="chevron-forward" size={26} color="#fff" />
-      </TouchableOpacity>
+      {cards.map(c => (
+        <TouchableOpacity key={c.testID} testID={c.testID}
+          style={[styles.card, { backgroundColor: c.bg }]}
+          onPress={() => router.push(c.route as any)}>
+          <View style={styles.iconWrap}>
+            <Ionicons name={c.icon as any} size={30} color={c.bg} />
+          </View>
+          <View style={{ flex: 1, marginLeft: 14 }}>
+            <Text style={styles.cardTitle}>{c.title}</Text>
+            <Text style={styles.cardSub}>{c.sub}</Text>
+          </View>
+          <Ionicons name="chevron-forward" size={26} color="#fff" />
+        </TouchableOpacity>
+      ))}
     </ScrollView>
   );
 }
