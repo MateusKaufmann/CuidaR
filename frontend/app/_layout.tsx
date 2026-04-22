@@ -20,6 +20,14 @@ export default function RootLayout() {
         <Stack.Screen name="food" options={{ title: "Alimentação" }} />
         <Stack.Screen name="water" options={{ title: "Água" }} />
         <Stack.Screen name="stats" options={{ title: "Estatísticas" }} />
+        <Stack.Screen name="reports" options={{ title: "Relatórios" }} />
+        <Stack.Screen
+          name="admin-login"
+          options={{ title: "Área do Administrador" }}
+        />
+        <Stack.Screen name="admin" options={{ title: "Administrador" }} />
+        <Stack.Screen name="settings" options={{ title: "Configurações" }} />
+        <Stack.Screen name="assistant" options={{ title: "Assistente" }} />
       </Stack>
     </SafeAreaProvider>
   );

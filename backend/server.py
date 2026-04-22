@@ -235,6 +235,243 @@ async def get_stats(days: int = 7):
     }
 
 
+# ----- ADMIN (password stored in settings collection) -----
+DEFAULT_ADMIN_PASSWORD = "2255"
+DEFAULT_WATER_GOAL = 2000
+DEFAULT_PATIENT_NAME = "Vovó"
+
+
+class PasswordIn(BaseModel):
+    password: str
+
+
+class ChangePasswordIn(BaseModel):
+    old_password: str
+    new_password: str
+
+
+class SettingsIn(BaseModel):
+    water_goal_ml: Optional[int] = None
+    patient_name: Optional[str] = None
+
+
+async def _get_setting(key: str, default):
+    doc = await db.settings.find_one({"key": key}, {"_id": 0})
+    if not doc:
+        await db.settings.insert_one({"key": key, "value": default})
+        return default
+    return doc["value"]
+
+
+async def _get_admin_password() -> str:
+    return await _get_setting("admin_password", DEFAULT_ADMIN_PASSWORD)
+
+
+@api_router.post("/admin/verify")
+async def admin_verify(data: PasswordIn):
+    current = await _get_admin_password()
+    return {"ok": data.password == current}
+
+
+@api_router.post("/admin/change-password")
+async def admin_change(data: ChangePasswordIn):
+    current = await _get_admin_password()
+    if data.old_password != current:
+        raise HTTPException(status_code=403, detail="Senha atual incorreta")
+    if not data.new_password or len(data.new_password) < 3:
+        raise HTTPException(status_code=400, detail="Nova senha muito curta")
+    await db.settings.update_one(
+        {"key": "admin_password"},
+        {"$set": {"value": data.new_password}},
+        upsert=True,
+    )
+    return {"ok": True}
+
+
+@api_router.get("/settings")
+async def get_settings():
+    water = await _get_setting("water_goal_ml", DEFAULT_WATER_GOAL)
+    name = await _get_setting("patient_name", DEFAULT_PATIENT_NAME)
+    return {"water_goal_ml": water, "patient_name": name}
+
+
+@api_router.post("/settings")
+async def update_settings(data: SettingsIn):
+    if data.water_goal_ml is not None:
+        if data.water_goal_ml < 100 or data.water_goal_ml > 10000:
+            raise HTTPException(status_code=400, detail="Meta inválida (100-10000 ml)")
+        await db.settings.update_one(
+            {"key": "water_goal_ml"},
+            {"$set": {"value": data.water_goal_ml}},
+            upsert=True,
+        )
+    if data.patient_name is not None:
+        name = data.patient_name.strip()
+        if not name:
+            raise HTTPException(status_code=400, detail="Nome inválido")
+        await db.settings.update_one(
+            {"key": "patient_name"},
+            {"$set": {"value": name}},
+            upsert=True,
+        )
+    return await get_settings()
+
+
+# ----- INCONSISTENCIES (check today) -----
+@api_router.get("/inconsistencies")
+async def inconsistencies():
+    now = datetime.now(timezone.utc) - timedelta(hours=3)  # Brazil time approx
+    today = now.date().isoformat()
+    hour = now.hour
+    alerts = []
+
+    food_today = await db.food.find_one({"date": today}, {"_id": 0})
+    insulin_today = await db.insulin.find({"date": today}, {"_id": 0}).to_list(100)
+    water_today = await db.water.find({"date": today}, {"_id": 0}).to_list(100)
+
+    # Meal alerts
+    meal_rules = [
+        ("cafe", 10, "Café da manhã não registrado"),
+        ("almoco", 14, "Almoço não registrado"),
+        ("janta", 21, "Janta não registrada"),
+    ]
+    for key, threshold_hour, message in meal_rules:
+        if hour >= threshold_hour:
+            entry = (food_today or {}).get(key)
+            if not entry or not entry.get("status"):
+                alerts.append({"level": "warning", "message": message})
+
+    # Glucose morning check
+    if hour >= 10 and not insulin_today:
+        alerts.append(
+            {"level": "warning", "message": "Glicemia da manhã ainda não registrada"}
+        )
+
+    # Low water after 15h
+    total_water = sum(w["amount_ml"] for w in water_today)
+    if hour >= 15 and total_water < 500:
+        alerts.append(
+            {
+                "level": "warning",
+                "message": f"Pouca água até o momento ({total_water} ml)",
+            }
+        )
+
+    return {"date": today, "alerts": alerts}
+
+
+# ----- REPORTS: period-based aggregation + insights -----
+def _period_range(period: str, start: Optional[str], end: Optional[str]):
+    today = (datetime.now(timezone.utc) - timedelta(hours=3)).date()
+    if period == "week":
+        s = today - timedelta(days=6)
+        return s.isoformat(), today.isoformat()
+    if period == "month":
+        s = today.replace(day=1)
+        return s.isoformat(), today.isoformat()
+    if period == "all":
+        return "0000-01-01", "9999-12-31"
+    if period == "custom" and start and end:
+        return start, end
+    return today.isoformat(), today.isoformat()
+
+
+def _build_insights(insulin, food, water):
+    good = []
+    concerns = []
+
+    # Water per day
+    water_by_date = {}
+    for w in water:
+        water_by_date[w["date"]] = water_by_date.get(w["date"], 0) + w["amount_ml"]
+    for d, total in water_by_date.items():
+        if total >= 1500:
+            good.append(f"Bastante água no dia {d} ({total} ml)")
+        elif total < 800 and total > 0:
+            concerns.append(f"Pouca água no dia {d} ({total} ml)")
+
+    # Glucose anomalies
+    for i in insulin:
+        g = i["glucose"]
+        if g > 180:
+            concerns.append(
+                f"Glicemia alta no dia {i['date']} às {i['time']} ({g} mg/dL)"
+            )
+        elif g < 70:
+            concerns.append(
+                f"Glicemia baixa no dia {i['date']} às {i['time']} ({g} mg/dL)"
+            )
+        elif 80 <= g <= 140:
+            good.append(f"Glicemia ideal no dia {i['date']} às {i['time']} ({g} mg/dL)")
+
+    # Meals
+    meal_labels = {
+        "cafe": "café da manhã",
+        "lanche": "lanche",
+        "almoco": "almoço",
+        "lanche_tarde": "lanche da tarde",
+        "janta": "janta",
+        "ceia": "ceia",
+    }
+    for f in food:
+        missed = []
+        full = []
+        for k, lbl in meal_labels.items():
+            m = f.get(k)
+            if m and m.get("status") == "nao_comeu":
+                missed.append(lbl)
+            if m and m.get("status") == "comeu_tudo":
+                full.append(lbl)
+        if missed:
+            concerns.append(f"No dia {f['date']}, não comeu: {', '.join(missed)}")
+        if len(full) >= 5:
+            good.append(f"Dia {f['date']}: ótima alimentação ({len(full)} refeições completas)")
+
+    return {"good": good[:20], "concerns": concerns[:20]}
+
+
+@api_router.get("/reports")
+async def get_report(
+    period: str = "week",
+    start: Optional[str] = None,
+    end: Optional[str] = None,
+):
+    s, e = _period_range(period, start, end)
+    insulin = await db.insulin.find(
+        {"date": {"$gte": s, "$lte": e}}, {"_id": 0}
+    ).sort([("date", 1), ("time", 1)]).to_list(5000)
+    food = await db.food.find(
+        {"date": {"$gte": s, "$lte": e}}, {"_id": 0}
+    ).sort("date", 1).to_list(5000)
+    water = await db.water.find(
+        {"date": {"$gte": s, "$lte": e}}, {"_id": 0}
+    ).sort([("date", 1), ("time", 1)]).to_list(5000)
+
+    insights = _build_insights(insulin, food, water)
+
+    return {
+        "period": period,
+        "start": s,
+        "end": e,
+        "insulin": insulin,
+        "food": food,
+        "water": water,
+        "insights": insights,
+    }
+
+
+@api_router.get("/assistant")
+async def assistant():
+    today = (datetime.now(timezone.utc) - timedelta(hours=3)).date()
+    s = (today - timedelta(days=6)).isoformat()
+    e = today.isoformat()
+    insulin = await db.insulin.find({"date": {"$gte": s, "$lte": e}}, {"_id": 0}).to_list(2000)
+    food = await db.food.find({"date": {"$gte": s, "$lte": e}}, {"_id": 0}).to_list(2000)
+    water = await db.water.find({"date": {"$gte": s, "$lte": e}}, {"_id": 0}).to_list(2000)
+    insights = _build_insights(insulin, food, water)
+    return {"start": s, "end": e, "insights": insights}
+
+
 app.include_router(api_router)
 
 app.add_middleware(

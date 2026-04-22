@@ -34,12 +34,16 @@ export default function WaterScreen() {
   const [amount, setAmount] = useState("");
   const [notes, setNotes] = useState("");
   const [saving, setSaving] = useState(false);
+  const [goal, setGoal] = useState(2000);
 
   const load = useCallback(async () => {
     try {
-      const res = await fetch(`${API_URL}/water?limit=200`);
-      const data = await res.json();
-      setRecords(data);
+      const [recRes, setRes] = await Promise.all([
+        fetch(`${API_URL}/water?limit=200`).then(r => r.json()),
+        fetch(`${API_URL}/settings`).then(r => r.json()),
+      ]);
+      setRecords(recRes);
+      if (setRes?.water_goal_ml) setGoal(setRes.water_goal_ml);
     } catch (e) {
       console.error(e);
     } finally {
@@ -68,26 +72,44 @@ export default function WaterScreen() {
       Alert.alert("Atenção", "Data ou hora inválidas.");
       return;
     }
-    setSaving(true);
-    try {
-      const payload: any = { date, time, amount_ml: ml };
-      if (notes) payload.notes = notes;
-      const res = await fetch(`${API_URL}/water`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(payload),
-      });
-      if (!res.ok) throw new Error("Erro");
-      setAmount("");
-      setNotes("");
-      setTime(nowTime());
-      await load();
-    } catch (e) {
-      Alert.alert("Erro", "Não foi possível salvar.");
-    } finally {
-      setSaving(false);
+
+    const doSave = async () => {
+      setSaving(true);
+      try {
+        const payload: any = { date, time, amount_ml: ml };
+        if (notes) payload.notes = notes;
+        const res = await fetch(`${API_URL}/water`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(payload),
+        });
+        if (!res.ok) throw new Error("Erro");
+        setAmount("");
+        setNotes("");
+        setTime(nowTime());
+        await load();
+      } catch (e) {
+        Alert.alert("Erro", "Não foi possível salvar.");
+      } finally {
+        setSaving(false);
+      }
+    };
+
+    if (ml > 1000) {
+      Alert.alert(
+        "Valor alto — confirmar?",
+        `Você inseriu ${ml} ml em um único registro. É um valor bem alto. Tem certeza?`,
+        [
+          { text: "Revisar", style: "cancel" },
+          { text: "Salvar mesmo assim", style: "destructive", onPress: doSave },
+        ]
+      );
+    } else {
+      doSave();
     }
   };
+
+  const goalValue = goal;
 
   const onDelete = (id: string) => {
     Alert.alert("Remover", "Deseja remover este registro?", [
@@ -103,8 +125,7 @@ export default function WaterScreen() {
     ]);
   };
 
-  const goal = 2000;
-  const pct = Math.min(100, Math.round((todayTotal / goal) * 100));
+  const pct = Math.min(100, Math.round((todayTotal / goalValue) * 100));
 
   return (
     <KeyboardAvoidingView
@@ -134,7 +155,7 @@ export default function WaterScreen() {
                 {todayTotal}
                 <Text style={styles.progressUnit}> ml</Text>
               </Text>
-              <Text style={styles.progressGoal}>Meta: {goal} ml</Text>
+              <Text style={styles.progressGoal}>Meta: {goalValue} ml</Text>
             </View>
           </View>
           <View style={styles.progressBar}>

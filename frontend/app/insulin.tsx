@@ -68,29 +68,50 @@ export default function InsulinScreen() {
       Alert.alert("Atenção", "Hora inválida. Use o formato HH:MM.");
       return;
     }
-    setSaving(true);
-    try {
-      const payload: any = { date, time, glucose: g };
-      if (insulinUnits) {
-        const u = parseFloat(insulinUnits.replace(",", "."));
+
+    // Validation warnings for unusual values
+    const warnings: string[] = [];
+    if (g < 40) warnings.push(`Glicemia ${g} mg/dL é muito BAIXA`);
+    if (g > 500) warnings.push(`Glicemia ${g} mg/dL é muito ALTA`);
+    const u = insulinUnits ? parseFloat(insulinUnits.replace(",", ".")) : NaN;
+    if (!isNaN(u) && u > 20) warnings.push(`${u} UI de insulina rápida é um valor ALTO`);
+    if (!isNaN(u) && u < 0) warnings.push(`Valor negativo de insulina`);
+
+    const doSave = async () => {
+      setSaving(true);
+      try {
+        const payload: any = { date, time, glucose: g };
         if (!isNaN(u)) payload.fast_insulin_units = u;
+        if (notes) payload.notes = notes;
+        const res = await fetch(`${API_URL}/insulin`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(payload),
+        });
+        if (!res.ok) throw new Error("Erro ao salvar");
+        setGlucose("");
+        setInsulinUnits("");
+        setNotes("");
+        setTime(nowTime());
+        await load();
+      } catch (e) {
+        Alert.alert("Erro", "Não foi possível salvar o registro.");
+      } finally {
+        setSaving(false);
       }
-      if (notes) payload.notes = notes;
-      const res = await fetch(`${API_URL}/insulin`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(payload),
-      });
-      if (!res.ok) throw new Error("Erro ao salvar");
-      setGlucose("");
-      setInsulinUnits("");
-      setNotes("");
-      setTime(nowTime());
-      await load();
-    } catch (e) {
-      Alert.alert("Erro", "Não foi possível salvar o registro.");
-    } finally {
-      setSaving(false);
+    };
+
+    if (warnings.length > 0) {
+      Alert.alert(
+        "Valor incomum — confirmar?",
+        warnings.join("\n") + "\n\nVocê tem certeza que deseja salvar?",
+        [
+          { text: "Revisar", style: "cancel" },
+          { text: "Salvar mesmo assim", style: "destructive", onPress: doSave },
+        ]
+      );
+    } else {
+      doSave();
     }
   };
 
