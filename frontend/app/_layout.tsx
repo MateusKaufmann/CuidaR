@@ -1,0 +1,26 @@
+import { Stack } from "expo-router";
+import { StatusBar } from "expo-status-bar";
+import { SafeAreaProvider } from "react-native-safe-area-context";
+
+export default function RootLayout() {
+  return (
+    <SafeAreaProvider>
+      <StatusBar style="dark" />
+      <Stack
+        screenOptions={{
+          headerStyle: { backgroundColor: "#F7F5F0" },
+          headerTintColor: "#3D405B",
+          headerTitleStyle: { fontWeight: "700", fontSize: 20 },
+          headerShadowVisible: false,
+          contentStyle: { backgroundColor: "#F7F5F0" },
+        }}
+      >
+        <Stack.Screen name="index" options={{ headerShown: false }} />
+        <Stack.Screen name="insulin" options={{ title: "Insulina" }} />
+        <Stack.Screen name="food" options={{ title: "Alimentação" }} />
+        <Stack.Screen name="water" options={{ title: "Água" }} />
+        <Stack.Screen name="stats" options={{ title: "Estatísticas" }} />
+      </Stack>
+    </SafeAreaProvider>
+  );
+}
