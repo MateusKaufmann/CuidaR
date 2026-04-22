@@ -36,9 +36,25 @@ export default function Reports() {
         : `${API_URL}/reports?period=${period}`;
       const r = await fetch(url);
       const data = await r.json();
-      const { insulin, food, water, insights } = data;
+      const { insulin, food, water, purchases, insights } = data;
 
       const periodLabel = PERIODS.find(p => p.key === period)?.label;
+
+      const foodRows = food.map((f: any) => {
+        const main = `<tr><td>${formatDateBR(f.date)}</td><td>${mealLbl(f.cafe?.status)}</td><td>${mealLbl(f.lanche?.status)}</td><td>${mealLbl(f.almoco?.status)}</td><td>${mealLbl(f.lanche_tarde?.status)}</td><td>${mealLbl(f.janta?.status)}</td><td>${mealLbl(f.ceia?.status)}</td><td>${f.caregiver||""}</td></tr>`;
+        const notes: string[] = [];
+        const meals = [
+          ["Café", f.cafe], ["Lanche", f.lanche], ["Almoço", f.almoco],
+          ["Lanche Tarde", f.lanche_tarde], ["Janta", f.janta], ["Ceia", f.ceia]
+        ];
+        meals.forEach(([lbl, m]: any) => {
+          if (m?.notes) notes.push(`<b>${lbl}:</b> ${m.notes}`);
+        });
+        const obsRow = notes.length > 0
+          ? `<tr><td colspan="8" style="background:#FAF8F2;font-size:11px;padding:4px 8px;"><i>Observações:</i> ${notes.join(" • ")}</td></tr>`
+          : "";
+        return main + obsRow;
+      }).join("");
 
       const html = `
 <html><head><meta charset="utf-8"/>
@@ -46,38 +62,39 @@ export default function Reports() {
 body { font-family: Helvetica, Arial, sans-serif; color: #3D405B; padding: 24px; }
 h1 { color: #E07A5F; margin-bottom: 4px; }
 h2 { color: #81B29A; margin-top: 28px; border-bottom: 2px solid #E3DDCF; padding-bottom: 6px; }
-h3 { color: #7FA3B5; margin-top: 18px; }
 table { width: 100%; border-collapse: collapse; margin-top: 8px; font-size: 12px; }
 th, td { border: 1px solid #E3DDCF; padding: 6px 8px; text-align: left; }
 th { background: #EFEBE1; }
 .meta { color: #6A6E8B; font-size: 12px; }
-.good { background: #E4F0EA; padding: 10px 14px; border-left: 4px solid #2A9D8F; margin: 6px 0; border-radius: 6px; }
-.bad { background: #FBDFE0; padding: 10px 14px; border-left: 4px solid #E63946; margin: 6px 0; border-radius: 6px; }
+.bad { background: #FBDFE0; padding: 10px 14px; border-left: 4px solid #E63946; margin: 6px 0; border-radius: 6px; font-size: 12px; }
 </style></head><body>
 <h1>RCare — Relatório de Cuidados</h1>
 <div class="meta">Período: ${formatDateBR(data.start)} — ${formatDateBR(data.end)} (${periodLabel})<br/>
 Gerado em ${formatDateBR(todayStr())}</div>
 
 <h2>Controle de Insulina / Glicemia (${insulin.length} registros)</h2>
-<table><thead><tr><th>Data</th><th>Hora</th><th>Glicemia (mg/dL)</th><th>Insulina Rápida (UI)</th><th>Obs.</th></tr></thead><tbody>
-${insulin.map((i:any)=>`<tr><td>${formatDateBR(i.date)}</td><td>${i.time}</td><td>${i.glucose}</td><td>${i.fast_insulin_units??"-"}</td><td>${i.notes??""}</td></tr>`).join("")}
+<table><thead><tr><th>Data</th><th>Hora</th><th>Glicemia (mg/dL)</th><th>Insulina Rápida (UI)</th><th>Obs.</th><th>Cuidador</th></tr></thead><tbody>
+${insulin.map((i:any)=>`<tr><td>${formatDateBR(i.date)}</td><td>${i.time}</td><td>${i.glucose}</td><td>${i.fast_insulin_units??"-"}</td><td>${i.notes??""}</td><td>${i.caregiver||""}</td></tr>`).join("")}
 </tbody></table>
 
 <h2>Alimentação (${food.length} dias)</h2>
-<table><thead><tr><th>Data</th><th>Café</th><th>Lanche</th><th>Almoço</th><th>Lanche Tarde</th><th>Janta</th><th>Ceia</th></tr></thead><tbody>
-${food.map((f:any)=>`<tr><td>${formatDateBR(f.date)}</td><td>${mealLbl(f.cafe?.status)}</td><td>${mealLbl(f.lanche?.status)}</td><td>${mealLbl(f.almoco?.status)}</td><td>${mealLbl(f.lanche_tarde?.status)}</td><td>${mealLbl(f.janta?.status)}</td><td>${mealLbl(f.ceia?.status)}</td></tr>`).join("")}
+<table><thead><tr><th>Data</th><th>Café</th><th>Lanche</th><th>Almoço</th><th>Lanche Tarde</th><th>Janta</th><th>Ceia</th><th>Cuidador</th></tr></thead><tbody>
+${foodRows}
 </tbody></table>
 
 <h2>Consumo de Água (${water.length} registros)</h2>
-<table><thead><tr><th>Data</th><th>Hora</th><th>Quantidade (ml)</th><th>Obs.</th></tr></thead><tbody>
-${water.map((w:any)=>`<tr><td>${formatDateBR(w.date)}</td><td>${w.time}</td><td>${w.amount_ml}</td><td>${w.notes??""}</td></tr>`).join("")}
+<table><thead><tr><th>Data</th><th>Hora</th><th>Quantidade (ml)</th><th>Obs.</th><th>Cuidador</th></tr></thead><tbody>
+${water.map((w:any)=>`<tr><td>${formatDateBR(w.date)}</td><td>${w.time}</td><td>${w.amount_ml}</td><td>${w.notes??""}</td><td>${w.caregiver||""}</td></tr>`).join("")}
 </tbody></table>
 
-<h2>Inconsistências e Destaques</h2>
-<h3>Pontos positivos</h3>
-${insights.good.length===0?'<p>Nenhum destaque.</p>':insights.good.map((g:string)=>`<div class="good">✓ ${g}</div>`).join("")}
-<h3>Pontos de atenção</h3>
-${insights.concerns.length===0?'<p>Nenhum ponto preocupante. 🎉</p>':insights.concerns.map((c:string)=>`<div class="bad">⚠ ${c}</div>`).join("")}
+<h2>Remédios — Compras (${(purchases||[]).length} registros)</h2>
+${(purchases||[]).length === 0 ? "<p>Nenhuma compra registrada no período.</p>" : `
+<table><thead><tr><th>Data</th><th>Remédio</th><th>Quantidade</th><th>Obs.</th><th>Cuidador</th></tr></thead><tbody>
+${(purchases||[]).map((p:any)=>`<tr><td>${formatDateBR(p.date)}</td><td>${p.medicine_name}</td><td>${p.quantity||"-"}</td><td>${p.notes||""}</td><td>${p.caregiver||""}</td></tr>`).join("")}
+</tbody></table>`}
+
+<h2>Inconsistências (${insights.concerns.length})</h2>
+${insights.concerns.length===0?'<p>Nenhuma inconsistência no período. 🎉</p>':insights.concerns.map((c:string)=>`<div class="bad">⚠ ${c}</div>`).join("")}
 
 </body></html>`;
 

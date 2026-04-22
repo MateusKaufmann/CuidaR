@@ -14,6 +14,8 @@ import {
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { COLORS, API_URL, todayStr, nowTime, formatDateBR } from "../src/theme";
+import CaregiverPicker from "../src/CaregiverPicker";
+import { useCaregiver } from "../src/useCaregiver";
 
 type Insulin = {
   id: string;
@@ -25,6 +27,7 @@ type Insulin = {
 };
 
 export default function InsulinScreen() {
+  const { current: currentCaregiver } = useCaregiver();
   const [records, setRecords] = useState<Insulin[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -78,9 +81,13 @@ export default function InsulinScreen() {
     if (!isNaN(u) && u < 0) warnings.push(`Valor negativo de insulina`);
 
     const doSave = async () => {
+      if (!currentCaregiver) {
+        Alert.alert("Atenção", "Selecione o cuidador que está registrando.");
+        return;
+      }
       setSaving(true);
       try {
-        const payload: any = { date, time, glucose: g };
+        const payload: any = { date, time, glucose: g, caregiver: currentCaregiver };
         if (!isNaN(u)) payload.fast_insulin_units = u;
         if (notes) payload.notes = notes;
         const res = await fetch(`${API_URL}/insulin`, {
@@ -146,6 +153,7 @@ export default function InsulinScreen() {
           />
         }
       >
+        <CaregiverPicker />
         <View style={styles.card}>
           <Text style={styles.cardTitle}>Novo registro</Text>
 
@@ -346,6 +354,7 @@ const styles = StyleSheet.create({
     color: COLORS.textSecondary,
     fontStyle: "italic",
   },
+  caregiverTag: { fontSize: 12, color: COLORS.primary, fontWeight: "700", marginTop: 4 },
   deleteBtn: { padding: 10 },
   empty: { alignItems: "center", padding: 30 },
   emptyText: { color: COLORS.textSecondary, marginTop: 10 },

@@ -32,6 +32,7 @@ class InsulinRecord(BaseModel):
     glucose: float  # mg/dL
     fast_insulin_units: Optional[float] = None
     notes: Optional[str] = None
+    caregiver: Optional[str] = None
     created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
 
 
@@ -41,6 +42,7 @@ class InsulinCreate(BaseModel):
     glucose: float
     fast_insulin_units: Optional[float] = None
     notes: Optional[str] = None
+    caregiver: Optional[str] = None
 
 
 class MealStatus(BaseModel):
@@ -57,6 +59,7 @@ class FoodRecord(BaseModel):
     lanche_tarde: Optional[MealStatus] = None
     janta: Optional[MealStatus] = None
     ceia: Optional[MealStatus] = None
+    caregiver: Optional[str] = None
     created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
     updated_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
 
@@ -69,6 +72,7 @@ class FoodUpsert(BaseModel):
     lanche_tarde: Optional[MealStatus] = None
     janta: Optional[MealStatus] = None
     ceia: Optional[MealStatus] = None
+    caregiver: Optional[str] = None
 
 
 class WaterRecord(BaseModel):
@@ -77,6 +81,7 @@ class WaterRecord(BaseModel):
     time: str  # HH:MM
     amount_ml: int
     notes: Optional[str] = None
+    caregiver: Optional[str] = None
     created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
 
 
@@ -85,6 +90,50 @@ class WaterCreate(BaseModel):
     time: str
     amount_ml: int
     notes: Optional[str] = None
+    caregiver: Optional[str] = None
+
+
+# --- Caregivers ---
+class Caregiver(BaseModel):
+    id: str = Field(default_factory=lambda: str(uuid.uuid4()))
+    name: str
+    created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+
+
+class CaregiverIn(BaseModel):
+    name: str
+
+
+# --- Medicines ---
+class Medicine(BaseModel):
+    id: str = Field(default_factory=lambda: str(uuid.uuid4()))
+    name: str
+    origin: str
+    created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+
+
+class MedicineIn(BaseModel):
+    name: str
+    origin: str
+
+
+class MedicinePurchase(BaseModel):
+    id: str = Field(default_factory=lambda: str(uuid.uuid4()))
+    medicine_id: str
+    medicine_name: str
+    date: str
+    quantity: Optional[str] = None
+    notes: Optional[str] = None
+    caregiver: Optional[str] = None
+    created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+
+
+class MedicinePurchaseIn(BaseModel):
+    medicine_id: str
+    date: str
+    quantity: Optional[str] = None
+    notes: Optional[str] = None
+    caregiver: Optional[str] = None
 
 
 # ============= ROUTES =============
@@ -461,8 +510,37 @@ async def get_report(
     water = await db.water.find(
         {"date": {"$gte": s, "$lte": e}}, {"_id": 0}
     ).sort([("date", 1), ("time", 1)]).to_list(5000)
+    purchases = await db.medicine_purchases.find(
+        {"date": {"$gte": s, "$lte": e}}, {"_id": 0}
+    ).sort("date", 1).to_list(5000)
 
     insights = _build_insights(insulin, food, water)
+
+    # Add "missing data" inconsistencies for date range
+    try:
+        from datetime import date as _date
+        sd = _date.fromisoformat(s) if s != "0000-01-01" else None
+        ed = _date.fromisoformat(e) if e != "9999-12-31" else None
+        today = (datetime.now(timezone.utc) - timedelta(hours=3)).date()
+        if sd and ed:
+            # Limit range to last 60 days for missing check
+            if (ed - sd).days <= 60:
+                dates_with_insulin = {i["date"] for i in insulin}
+                dates_with_water = {w["date"] for w in water}
+                dates_with_food = {f["date"] for f in food}
+                d = sd
+                while d <= ed and d <= today:
+                    ds = d.isoformat()
+                    br = _fmt_br(ds)
+                    if ds not in dates_with_insulin:
+                        insights["concerns"].append(f"Sem registro de glicemia no dia {br}")
+                    if ds not in dates_with_water:
+                        insights["concerns"].append(f"Sem registro de água no dia {br}")
+                    if ds not in dates_with_food:
+                        insights["concerns"].append(f"Sem registro de alimentação no dia {br}")
+                    d = d + timedelta(days=1)
+    except Exception:
+        pass
 
     return {
         "period": period,
@@ -471,6 +549,7 @@ async def get_report(
         "insulin": insulin,
         "food": food,
         "water": water,
+        "purchases": purchases,
         "insights": insights,
     }
 
@@ -485,6 +564,96 @@ async def assistant():
     water = await db.water.find({"date": {"$gte": s, "$lte": e}}, {"_id": 0}).to_list(2000)
     insights = _build_insights(insulin, food, water)
     return {"start": s, "end": e, "insights": insights}
+
+
+# ----- CAREGIVERS -----
+@api_router.post("/caregivers", response_model=Caregiver)
+async def create_caregiver(data: CaregiverIn):
+    name = data.name.strip()
+    if not name:
+        raise HTTPException(status_code=400, detail="Nome obrigatório")
+    record = Caregiver(name=name)
+    await db.caregivers.insert_one(record.dict())
+    return record
+
+
+@api_router.get("/caregivers", response_model=List[Caregiver])
+async def list_caregivers():
+    docs = await db.caregivers.find({}, {"_id": 0}).sort("name", 1).to_list(500)
+    return [Caregiver(**d) for d in docs]
+
+
+@api_router.delete("/caregivers/{cid}")
+async def delete_caregiver(cid: str):
+    r = await db.caregivers.delete_one({"id": cid})
+    if r.deleted_count == 0:
+        raise HTTPException(status_code=404, detail="Cuidador não encontrado")
+    return {"ok": True}
+
+
+# ----- MEDICINES -----
+@api_router.post("/medicines", response_model=Medicine)
+async def create_medicine(data: MedicineIn):
+    name = data.name.strip()
+    origin = data.origin.strip()
+    if not name:
+        raise HTTPException(status_code=400, detail="Nome obrigatório")
+    if not origin:
+        raise HTTPException(status_code=400, detail="Origem obrigatória")
+    record = Medicine(name=name, origin=origin)
+    await db.medicines.insert_one(record.dict())
+    return record
+
+
+@api_router.get("/medicines", response_model=List[Medicine])
+async def list_medicines():
+    docs = await db.medicines.find({}, {"_id": 0}).sort("name", 1).to_list(500)
+    return [Medicine(**d) for d in docs]
+
+
+@api_router.delete("/medicines/{mid}")
+async def delete_medicine(mid: str):
+    r = await db.medicines.delete_one({"id": mid})
+    if r.deleted_count == 0:
+        raise HTTPException(status_code=404, detail="Remédio não encontrado")
+    # Also delete purchases linked to it
+    await db.medicine_purchases.delete_many({"medicine_id": mid})
+    return {"ok": True}
+
+
+# ----- MEDICINE PURCHASES -----
+@api_router.post("/medicine-purchases", response_model=MedicinePurchase)
+async def create_purchase(data: MedicinePurchaseIn):
+    med = await db.medicines.find_one({"id": data.medicine_id}, {"_id": 0})
+    if not med:
+        raise HTTPException(status_code=404, detail="Remédio não cadastrado")
+    record = MedicinePurchase(
+        medicine_id=data.medicine_id,
+        medicine_name=med["name"],
+        date=data.date,
+        quantity=data.quantity,
+        notes=data.notes,
+        caregiver=data.caregiver,
+    )
+    await db.medicine_purchases.insert_one(record.dict())
+    return record
+
+
+@api_router.get("/medicine-purchases", response_model=List[MedicinePurchase])
+async def list_purchases(medicine_id: Optional[str] = None, limit: int = 500):
+    q = {}
+    if medicine_id:
+        q["medicine_id"] = medicine_id
+    docs = await db.medicine_purchases.find(q, {"_id": 0}).sort("date", -1).to_list(limit)
+    return [MedicinePurchase(**d) for d in docs]
+
+
+@api_router.delete("/medicine-purchases/{pid}")
+async def delete_purchase(pid: str):
+    r = await db.medicine_purchases.delete_one({"id": pid})
+    if r.deleted_count == 0:
+        raise HTTPException(status_code=404, detail="Compra não encontrada")
+    return {"ok": True}
 
 
 app.include_router(api_router)

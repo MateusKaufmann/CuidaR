@@ -24,10 +24,12 @@ const CARDS: {
     sub: "Registro das 6 refeições", icon: "restaurant", bg: COLORS.secondary },
   { testID: "home-water-btn", route: "/water", title: "ÁGUA",
     sub: "Hidratação em mililitros", icon: "water", bg: COLORS.accent },
+  { testID: "home-medicines-btn", route: "/medicines", title: "REMÉDIOS",
+    sub: "Compras e medicamentos", icon: "medical", bg: "#9B6A8F" },
   { testID: "home-assistant-btn", route: "/assistant", title: "ASSISTENTE",
     sub: "Resumo inteligente da semana", icon: "sparkles", bg: "#D62828" },
   { testID: "home-admin-btn", route: "/admin-login", title: "ADMINISTRADOR",
-    sub: "Relatórios, gráficos, configurações", icon: "shield-checkmark", bg: "#5A6478" },
+    sub: "Relatórios, gráficos, cadastros", icon: "shield-checkmark", bg: "#5A6478" },
 ];
 
 export default function Index() {

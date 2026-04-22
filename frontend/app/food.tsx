@@ -14,6 +14,8 @@ import {
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { COLORS, API_URL, todayStr, formatDateBR } from "../src/theme";
+import CaregiverPicker from "../src/CaregiverPicker";
+import { useCaregiver } from "../src/useCaregiver";
 
 type MealKey = "cafe" | "lanche" | "almoco" | "lanche_tarde" | "janta" | "ceia";
 type Status = "comeu_tudo" | "comeu_metade" | "nao_comeu" | null;
@@ -43,6 +45,7 @@ type DayRecord = {
 };
 
 export default function FoodScreen() {
+  const { current: currentCaregiver } = useCaregiver();
   const [date, setDate] = useState(todayStr());
   const [record, setRecord] = useState<DayRecord>({});
   const [history, setHistory] = useState<any[]>([]);
@@ -88,30 +91,50 @@ export default function FoodScreen() {
       Alert.alert("Atenção", "Data inválida.");
       return;
     }
-    setSaving(true);
-    try {
-      const payload: any = { date };
-      MEALS.forEach((m) => {
-        const entry = (record as any)[m.key];
-        if (entry && (entry.status || entry.notes)) {
-          payload[m.key] = {
-            status: entry.status || null,
-            notes: entry.notes || null,
-          };
-        }
-      });
-      const res = await fetch(`${API_URL}/food`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(payload),
-      });
-      if (!res.ok) throw new Error("Erro");
-      await load();
-      Alert.alert("Salvo!", "Registro do dia atualizado.");
-    } catch (e) {
-      Alert.alert("Erro", "Não foi possível salvar.");
-    } finally {
-      setSaving(false);
+    if (!currentCaregiver) {
+      Alert.alert("Atenção", "Selecione o cuidador que está registrando.");
+      return;
+    }
+
+    const doSave = async () => {
+      setSaving(true);
+      try {
+        const payload: any = { date, caregiver: currentCaregiver };
+        MEALS.forEach((m) => {
+          const entry = (record as any)[m.key];
+          if (entry && (entry.status || entry.notes)) {
+            payload[m.key] = {
+              status: entry.status || null,
+              notes: entry.notes || null,
+            };
+          }
+        });
+        const res = await fetch(`${API_URL}/food`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(payload),
+        });
+        if (!res.ok) throw new Error("Erro");
+        await load();
+        Alert.alert("Salvo!", "Registro do dia atualizado.");
+      } catch (e) {
+        Alert.alert("Erro", "Não foi possível salvar.");
+      } finally {
+        setSaving(false);
+      }
+    };
+
+    if (date !== todayStr()) {
+      Alert.alert(
+        "Atenção — dia diferente de hoje",
+        `Você está editando o registro de ${formatDateBR(date)}, que NÃO é hoje (${formatDateBR(todayStr())}). Confira a data antes de continuar.`,
+        [
+          { text: "Cancelar", style: "cancel" },
+          { text: "Confirmar e salvar", style: "destructive", onPress: doSave },
+        ]
+      );
+    } else {
+      doSave();
     }
   };
 
@@ -132,6 +155,7 @@ export default function FoodScreen() {
           />
         }
       >
+        <CaregiverPicker />
         <View style={styles.dateCard}>
           <Text style={styles.label}>Data do registro</Text>
           <TextInput

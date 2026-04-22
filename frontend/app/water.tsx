@@ -14,6 +14,8 @@ import {
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { COLORS, API_URL, todayStr, nowTime, formatDateBR } from "../src/theme";
+import CaregiverPicker from "../src/CaregiverPicker";
+import { useCaregiver } from "../src/useCaregiver";
 
 type Water = {
   id: string;
@@ -26,6 +28,7 @@ type Water = {
 const QUICK_ML = [100, 200, 250, 500];
 
 export default function WaterScreen() {
+  const { current: currentCaregiver } = useCaregiver();
   const [records, setRecords] = useState<Water[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -144,6 +147,7 @@ export default function WaterScreen() {
           />
         }
       >
+        <CaregiverPicker />
         <View style={styles.progressCard}>
           <View style={styles.progressTop}>
             <View style={styles.dropCircle}>
@@ -265,6 +269,7 @@ export default function WaterScreen() {
                   <Text style={styles.pillText}>{r.amount_ml} ml</Text>
                 </View>
                 {r.notes ? <Text style={styles.notes}>{r.notes}</Text> : null}
+                {(r as any).caregiver ? <Text style={styles.caregiverTag}>por {(r as any).caregiver}</Text> : null}
               </View>
               <TouchableOpacity
                 testID={`water-delete-${r.id}`}
@@ -402,6 +407,7 @@ const styles = StyleSheet.create({
     color: COLORS.textSecondary,
     fontStyle: "italic",
   },
+  caregiverTag: { fontSize: 12, color: COLORS.accent, fontWeight: "700", marginTop: 4 },
   deleteBtn: { padding: 10 },
   empty: { alignItems: "center", padding: 30 },
   emptyText: { color: COLORS.textSecondary, marginTop: 10 },

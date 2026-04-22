@@ -28,6 +28,9 @@ export default function RootLayout() {
         <Stack.Screen name="admin" options={{ title: "Administrador" }} />
         <Stack.Screen name="settings" options={{ title: "Configurações" }} />
         <Stack.Screen name="assistant" options={{ title: "Assistente" }} />
+        <Stack.Screen name="medicines" options={{ title: "Remédios" }} />
+        <Stack.Screen name="medicines-admin" options={{ title: "Cadastro de Remédios" }} />
+        <Stack.Screen name="caregivers" options={{ title: "Cuidadores" }} />
       </Stack>
     </SafeAreaProvider>
   );

@@ -98,8 +98,42 @@ export default function StatsScreen() {
     });
   }
 
+  const isSingleDay = data && data.start === data.end;
   const totalWater = series.water.reduce((a, b) => a + b, 0);
   const totalMeals = mealCounts.comeu_tudo + mealCounts.comeu_metade + mealCounts.nao_comeu;
+
+  // Build timeline events for single-day view
+  const buildTimeline = () => {
+    if (!data) return [] as any[];
+    const events: any[] = [];
+    data.insulin.forEach((i: any) => events.push({
+      time: i.time, type: "insulin", icon: "pulse", color: COLORS.primary,
+      text: `Glicemia: ${i.glucose} mg/dL${i.fast_insulin_units ? ` • ${i.fast_insulin_units} UI` : ""}`,
+      caregiver: i.caregiver, notes: i.notes,
+    }));
+    data.water.forEach((w: any) => events.push({
+      time: w.time, type: "water", icon: "water", color: COLORS.accent,
+      text: `Água: ${w.amount_ml} ml`, caregiver: w.caregiver, notes: w.notes,
+    }));
+    const mealOrder: Record<string, string> = {
+      cafe: "Café da manhã", lanche: "Lanche", almoco: "Almoço",
+      lanche_tarde: "Lanche da tarde", janta: "Janta", ceia: "Ceia",
+    };
+    data.food.forEach((f: any) => {
+      Object.entries(mealOrder).forEach(([k, lbl]) => {
+        if (f[k]?.status) {
+          events.push({
+            time: "—", type: "food", icon: "restaurant", color: COLORS.secondary,
+            text: `${lbl}: ${f[k].status === "comeu_tudo" ? "comeu tudo" :
+              f[k].status === "comeu_metade" ? "comeu metade" : "não comeu"}`,
+            caregiver: f.caregiver, notes: f[k].notes,
+          });
+        }
+      });
+    });
+    return events.sort((a, b) => (a.time || "").localeCompare(b.time || ""));
+  };
+  const timeline = isSingleDay ? buildTimeline() : [];
 
   return (
     <ScrollView contentContainerStyle={styles.container}>
@@ -165,7 +199,32 @@ export default function StatsScreen() {
             </View>
           </View>
 
-          {series.labels.length > 0 ? (
+          {isSingleDay ? (
+            <View style={styles.chartCard}>
+              <Text style={styles.chartTitle}>📅 Linha do tempo do dia</Text>
+              {timeline.length === 0 ? (
+                <Text style={styles.emptyChart}>Nenhum evento neste dia.</Text>
+              ) : timeline.map((ev, i) => (
+                <View key={i} style={{ flexDirection: "row", alignItems: "flex-start",
+                  paddingVertical: 8, borderBottomWidth: i < timeline.length - 1 ? 1 : 0,
+                  borderBottomColor: COLORS.border }}>
+                  <View style={{ width: 48, alignItems: "center" }}>
+                    <Text style={{ fontSize: 13, fontWeight: "700", color: ev.color }}>{ev.time}</Text>
+                    <Ionicons name={ev.icon as any} size={18} color={ev.color} style={{ marginTop: 4 }} />
+                  </View>
+                  <View style={{ flex: 1, marginLeft: 10 }}>
+                    <Text style={{ fontSize: 14, fontWeight: "600", color: COLORS.textPrimary }}>{ev.text}</Text>
+                    {ev.caregiver ? (
+                      <Text style={{ fontSize: 11, color: ev.color, fontWeight: "700", marginTop: 2 }}>por {ev.caregiver}</Text>
+                    ) : null}
+                    {ev.notes ? (
+                      <Text style={{ fontSize: 12, color: COLORS.textSecondary, fontStyle: "italic", marginTop: 2 }}>{ev.notes}</Text>
+                    ) : null}
+                  </View>
+                </View>
+              ))}
+            </View>
+          ) : series.labels.length > 0 ? (
             <>
               <View style={styles.chartCard}>
                 <Text style={styles.chartTitle}>💧 Água por dia (ml)</Text>
