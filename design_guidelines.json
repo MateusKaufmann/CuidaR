@@ -1,0 +1,103 @@
+{
+  "theme": "Light",
+  "archetype": "1 (Organic & Earthy)",
+  "design_philosophy": "A warm, accessible, and intuitive interface designed for elderly care. Prioritizes large touch targets, highly readable typography, and a calming 'pastel earthy' palette to reduce cognitive load and build trust.",
+  "colors": {
+    "background": "#F7F5F0",
+    "surface": "#FFFFFF",
+    "surface_secondary": "#EFEBE1",
+    "primary": "#E07A5F",
+    "primary_hover": "#D16B50",
+    "secondary": "#81B29A",
+    "secondary_hover": "#70A089",
+    "accent": "#7FA3B5",
+    "accent_hover": "#6C92A5",
+    "text_primary": "#3D405B",
+    "text_secondary": "#6A6E8B",
+    "text_light": "#FFFFFF",
+    "border": "#E3DDCF",
+    "error": "#E63946",
+    "success": "#2A9D8F"
+  },
+  "typography": {
+    "font_families": {
+      "heading": "Manrope, sans-serif",
+      "body": "Manrope, sans-serif"
+    },
+    "scale": {
+      "h1": "text-4xl md:text-5xl font-extrabold tracking-tight leading-tight",
+      "h2": "text-2xl md:text-3xl font-bold tracking-tight leading-snug",
+      "h3": "text-xl font-bold",
+      "body": "text-lg leading-relaxed text-[#3D405B]",
+      "caption": "text-sm md:text-base font-medium text-[#6A6E8B]"
+    }
+  },
+  "layout_and_spacing": {
+    "philosophy": "Generous spacing. Avoid clutter. Everything should be easily tappable by users with limited dexterity.",
+    "container": "max-w-md mx-auto min-h-screen bg-[#F7F5F0] shadow-xl",
+    "padding": "p-6 md:p-8",
+    "touch_targets": "Minimum 56px height (h-14) for all buttons and inputs. 24px icon sizes.",
+    "radius": "rounded-2xl or rounded-3xl for cards/buttons to feel friendly and soft."
+  },
+  "components": {
+    "button_primary": "h-16 w-full rounded-2xl bg-[#E07A5F] text-white font-bold text-xl shadow-sm hover:shadow-md transition-all flex items-center justify-center gap-3",
+    "bento_action_card": "flex flex-col items-center justify-center p-6 rounded-3xl shadow-sm border border-[#E3DDCF] bg-white transition-all active:scale-95",
+    "card": "bg-white p-6 rounded-3xl shadow-[0_4px_20px_rgba(61,64,91,0.05)] border border-[#E3DDCF]",
+    "input": "w-full h-14 bg-[#F7F5F0] border-none rounded-xl px-4 text-lg text-[#3D405B] focus:ring-2 focus:ring-[#E07A5F]",
+    "table_alternative_list": "space-y-4 instead of dense tables. Each record is a clear, padded card showing Date, Time, and Value.",
+    "tab_bar": "fixed bottom-0 w-full h-20 bg-white border-t border-[#E3DDCF] flex justify-around items-center px-4 z-50 rounded-t-3xl shadow-[0_-4px_20px_rgba(61,64,91,0.05)]"
+  },
+  "icons": {
+    "library": "lucide-react",
+    "mapping": {
+      "insulin": "Syringe",
+      "food": "Utensils",
+      "water": "Droplets",
+      "stats": "BarChart3",
+      "export": "FileDown",
+      "notifications": "Bell",
+      "home": "Home"
+    }
+  },
+  "media_urls": {
+    "avatar": {
+      "url": "https://images.unsplash.com/photo-1643224196036-a61f69ff4144?crop=entropy&cs=srgb&fm=jpg&ixid=M3w4NjAzNDR8MHwxfHNlYXJjaHwxfHxzbWlsaW5nJTIwZWxkZXJseSUyMHdvbWFuJTIwcG9ydHJhaXQlMjBzb2Z0JTIwbGlnaHRpbmd8ZW58MHx8fHwxNzc2ODcwNjU0fDA&ixlib=rb-4.1.0&q=85",
+      "description": "Smiling elderly woman portrait for the patient profile",
+      "category": "patient_avatar"
+    }
+  },
+  "pages_structure": {
+    "Home": {
+      "description": "Dashboard with large action buttons.",
+      "layout": "Top section: Patient Avatar and Name. Middle section: 3 Massive Bento Grid buttons for Insulina (Terracotta), Alimentação (Sage), and Água (Soft Blue). Bottom section: Quick summary/stats and 'Export PDF' button."
+    },
+    "Insulin_Screen": {
+      "description": "Tracking table/list for Insulin.",
+      "layout": "Sticky header with back button. Input form: Date/Time picker, Glucose level input, Fast Insulin Units (optional). Below: List of today's records as distinct cards, avoiding tiny spreadsheet tables."
+    },
+    "Food_Screen": {
+      "description": "Daily meals tracking.",
+      "layout": "Categorized by meal: Café, Lanche, Almoço, Lanche da Tarde, Janta, Ceia. Each meal has a card with a status selector (Comeu tudo, Comeu metade, Não comeu) using visual pill buttons. Optional Notes text area."
+    },
+    "Water_Screen": {
+      "description": "Water consumption tracking in ml.",
+      "layout": "Large circular progress or simple big input for ML added. Below: List of timestamps and ml consumed today. Optional notes field."
+    },
+    "Stats_Screen": {
+      "description": "Data visualization.",
+      "layout": "Recharts used to show simple bar charts for weekly water intake, and line charts for glucose levels. Must be color-blind friendly and use large labels."
+    }
+  },
+  "accessibility_and_testing": {
+    "contrast": "Text colors against pastel backgrounds must be tested. Use #3D405B for text inside pastel buttons if white fails contrast.",
+    "testing_attributes": "All interactive elements must include a data-testid attribute in kebab-case representing their role (e.g., data-testid='add-insulin-button').",
+    "interactions": "Provide immediate visual feedback for all taps (opacity change, scale down)."
+  },
+  "instructions_to_main_agent": [
+    "Use standard pure HTML/Tailwind for the bento grid buttons on the Home screen to achieve the customized look.",
+    "Use Shadcn UI components for complex interactive logic (forms, selects, dialogs) but heavily override their styles to match the rounded-2xl, soft, borderless aesthetic. Remove standard Vercel-like sharp edges.",
+    "Do not build raw <table> tags. Instead, build a 'List' component where each row is a soft card. This is critical for mobile viewability.",
+    "Ensure all text sizes are base text-lg minimum. Avoid text-xs entirely.",
+    "Export to PDF can use standard print-to-pdf logic or a library like jspdf. Local notifications logic should be stubbed out with toast notifications for the web version if running in browser."
+  ]
+}
